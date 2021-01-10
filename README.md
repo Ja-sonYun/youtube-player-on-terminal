@@ -5,7 +5,7 @@ Play YouTube in background using selenium on the terminal(curses)
 # In progress
 
 # Usage
-```python youplayr.py --headless```
+```python youplayr.py --headless```   
 j - move down   
 k - move up, stop/play music   
 enter - click   
