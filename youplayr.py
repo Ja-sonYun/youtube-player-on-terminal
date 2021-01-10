@@ -7,10 +7,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 from bs4 import BeautifulSoup
 from time import sleep
+import sys
 import curses
 
 class Parser:
-    def __init__(self, is_headless):
+    def __init__(self, is_headless=False):
         options = webdriver.ChromeOptions()
         CHROMEDRIVER_PATH = '/Users/jasonyun/.chromedriver'
         self.YOUTUBE_PATH = 'https://www.youtube.com'
@@ -54,34 +55,29 @@ class Parser:
     def select_music_by_id(self, _id):
         self.selected = self.titles[_id]
 
-    def play_music(self, debug, _id = None):
-        if(_id != None): self.select_music_by_id(_id)
+    def is_finished(self):
+        try:
+            self.driver.find_element_by_xpath("//a[@class='ytp-upnext-autoplay-icon']").click()
+            self.prevent_stop_showing_bottom_bar()
+            return True
+        except:
+            return False
 
-        self.driver.get(self.YOUTUBE_PATH+'{}'.format(str(self.selected['href'])))
-
+    def pass_ads(self, debug):
         while(True):
             try:
-                status = self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").get_attribute("aria-label")
-                status = 'playing' if self.PAUSE_BUTTON_PATH_TITLE == status else 'paused'
-                break
-            except:
-                sleep(0.5)
-
-        if(status == 'paused'):
-            try:
-                self.driver.find_element_by_xpath("//button[@title='Play (k)']").click()
-            except:
-                sleep(0.5)
-        while(True):
-            try:
-                self.driver.find_element_by_xpath("//div[@class='ytp-title-text']/a[text()[contains(., '"+self.get_name_from_title(self.selected)+"')]]")
+                cur_title = self.driver.find_element_by_xpath("//*[@id='container']/h1/yt-formatted-string").get_attribute('innerHTML')
+                self.driver.find_element_by_xpath("//div[@class='ytp-title-text']/a[text()[contains(., '"
+                        + cur_title +"')]]")
                 normal = True
+                return
             except:
                 normal = False
             try:
                 self.driver.find_element_by_xpath("//div[@class='ytp-ad-player-overlay']")
                 is_advertising = True
-                debug('found advertise')
+                self.driver.find_element_by_xpath("//button[@title='Settings']").click()
+                debug('found advertisements. skipping...')
             except:
                 is_advertising = False
             if(normal or is_advertising): break
@@ -89,17 +85,39 @@ class Parser:
 
         while(is_advertising):
             try:
-                self.driver.find_element_by_xpath("//div[@class='ytp-title-text']/a[text()[contains(., '"+self.get_name_from_title(self.selected)+"')]]")
+                cur_title = self.driver.find_element_by_xpath("//*[@id='container']/h1/yt-formatted-string").get_attribute('innerHTML')
+                self.driver.find_element_by_xpath("//div[@class='ytp-title-text']/a[text()[contains(., '"
+                        + cur_title +"')]]")
                 break;
             except:
                 try:
                     self.driver.find_element_by_xpath("//button[@class='ytp-ad-skip-button ytp-button']").click()
-                    debug('processed advertise')
+                    debug('skipped!')
                 except:
                     sleep(0.5)
+        self.driver.find_element_by_xpath("//button[@title='Settings']").click()
+
+    def play_music(self, debug, _id = None):
+        if(_id != None): self.select_music_by_id(_id)
+        debug('loading...')
+
+        self.driver.get(self.YOUTUBE_PATH+'{}'.format(str(self.selected['href'])))
 
         while(True):
             try:
+                debug('getting button state')
+                status = self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").get_attribute("aria-label")
+                status = 'playing' if self.PAUSE_BUTTON_PATH_TITLE == status else 'paused'
+                break
+            except:
+                sleep(0.5)
+
+        debug('checking ads exists')
+        self.pass_ads(debug)
+
+        while(True):
+            try:
+                debug('getting button state')
                 status = self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").get_attribute("aria-label")
                 status = 'playing' if self.PAUSE_BUTTON_PATH_TITLE == status else 'paused'
                 break
@@ -107,31 +125,55 @@ class Parser:
                 sleep(0.5)
 
         if(status == 'paused'):
-            try:
-                self.driver.find_element_by_xpath("//button[@title='Play (k)']").click()
-                status = 'playing'
-            except:
-                sleep(0.5)
+            while True:
+                debug('video paused. playing...')
+                try:
+                    self.driver.find_element_by_xpath("//button[@title='Play (k)']").click()
+                    status = 'playing'
+                    break
+                except:
+                    sleep(0.5)
 
-        debug('-----Done------')
+        debug('almost done...')
+        self.prevent_stop_showing_bottom_bar()
 
         self.status = status
 
-    def music_toggle():
-        self.actions.send_keys('k')
-        self.actions.perform()
-        if(self.status == 'playing'): self.status == 'paused'
-        else: self.status == 'playing'
+    def get_video_current_and_duration(self):
+        try:
+            return [self.driver.find_element_by_xpath("//span[@class='ytp-time-current']").get_attribute('innerHTML'),
+                    self.driver.find_element_by_xpath("//span[@class='ytp-time-duration']").get_attribute('innerHTML')]
+        except:
+            return ['error','error']
+
+
+    def prevent_stop_showing_bottom_bar(self):
+        try:
+            self.driver.find_element_by_xpath("//button[@title='Settings']").click()
+        except:
+            pass
+
+
+    def music_toggle(self):
+        try:
+            self.driver.find_element_by_xpath("//button[@aria-label='Play (k)']").click()
+            self.status = 'playing'
+        except:
+            self.driver.find_element_by_xpath("//button[@aria-label='Pause (k)']").click()
+            self.status = 'Paused'
+        sleep(0.2)
+        self.prevent_stop_showing_bottom_bar()
 
     @staticmethod
     def get_name_from_title(title):
         return title.find('yt-formatted-string').string
 
+    def get_current_video_title(self):
+        return self.driver.find_element_by_xpath("//*[@id='container']/h1/yt-formatted-string").get_attribute('innerHTML')
+
     def get_current_status(self):
-        self.html = self.driver.page_source
-        soup = BeautifulSoup(self.html, 'html.parser')
-        status = soup.find_all('button').find(class_='ytp-play-button ytp-button')
-        return status
+        status = self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").get_attribute("aria-label")
+        self.status = 'paused' if self.PAUSE_BUTTON_PATH_TITLE == status else 'playing'
 
     def get_progress_as_percent(self):
         progress_float = self.driver.find_element_by_xpath("//div[@class='ytp-play-progress ytp-swatch-background-color']").get_attribute("style")
@@ -149,6 +191,9 @@ class Parser:
             return True
         except:
             return False
+
+    def next_music(self):
+        pass
 
     def quit(self):
         self.driver.quit()
@@ -192,8 +237,9 @@ class Screen:
             try:
                 cmd = self.console_input(self.rows-1, 4)
                 # after get command from prompt
+                if cmd == -1: continue
 
-                if cmd[:4] == "quit" or cmd[0] == 'q': break
+                elif cmd[:4] == "quit" or cmd[0] == 'q': break
 
                 elif cmd[:4] == "help" or cmd[0] == 'h':
                     self.clear_box()
@@ -220,67 +266,94 @@ class Screen:
         current_cur = 0
 
         self.list_up_music(4, 4, parser.titles, current_cur)
+        self.stdscr.timeout(100)
         while True:
-            c = self.stdscr.getkey()
-            if c == "k":
-                current_cur = current_cur - 1 if current_cur > 0 else current_cur
+            c = self.stdscr.getch()
+            try:
+                c = chr(c)
+                self.stdscr.addstr(0, 0, c)
+                if c == "k":
+                    current_cur = current_cur - 1 if current_cur > 0 else current_cur
+                    self.list_up_music(4, 4, parser.titles, current_cur)
 
-            elif c == "j":
-                current_cur = current_cur + 1 if current_cur < len(parser.titles)-1 else current_cur
+                elif c == "j":
+                    current_cur = current_cur + 1 if current_cur < len(parser.titles)-1 else current_cur
+                    self.list_up_music(4, 4, parser.titles, current_cur)
 
-            elif c == "q":
-                self.list_up_music(4, 4, parser.titles, -1)
-                break
+                elif c == "q":
+                    self.list_up_music(4, 4, parser.titles, -1)
+                    break
 
-            elif c == "\n":
-                self.clear_box()
-                parser.play_music(self.console_log, current_cur)
-                self.music_player_loop(parser)
-                break
-
-            self.list_up_music(4, 4, parser.titles, current_cur)
+                elif c == "\n":
+                    self.clear_box()
+                    parser.play_music(self.print_process, current_cur)
+                    self.music_player_loop(parser)
+                    break
+            except ValueError:
+                self.stdscr.addch(0, 0, ' ')
 
     def music_player_loop(self, parser):
-        self.print_player_title(Parser.get_name_from_title(parser.selected))
         self.print_player_border()
-        #  self.stdscr.timeout(300)
-        #  while True:
-        self.print_player_status(parser.status)
-        self.print_player_progress_bar(parser.get_progress_as_percent())
+        while True:
+            parser.is_finished() #  move to next vidoe
+            self.print_player_status(parser.status)
+            self.print_player_progress_bar(parser.get_progress_as_percent())
+            self.print_current_and_duration_time(parser.get_video_current_and_duration())
+            self.print_player_title(parser.get_current_video_title())
+            parser.pass_ads(self.print_process)
 
-        self.stdscr.refresh()
+            self.stdscr.refresh()
 
-            #  c = self.stdscr.getch()
-            #  if c == 'k':
-            #      parser.music_toggle()
-            #  elif c == 'q':
-            #      self.clear_box()
-            #      break
-
+            c = self.stdscr.getch()
+            try:
+                c = chr(c)
+                if c == 'k':
+                    parser.music_toggle()
+                if c == 'n':
+                    parser.next_music()
+                elif c == 'q':
+                    self.clear_box()
+                    break
+            except ValueError:
+                pass
 
     def print_player_progress_bar(self, percent):
         percentage = int(percent[:-1]) + 1
-        progress_bar_size = self.cols - 19
-        progress_bar_loaded = '=' * (int(float(percentage / progress_bar_size) * 100))
-        progress_bar_unload = '_' * (int(progress_bar_size)-int(float(percentage / progress_bar_size) * 100))
+        progress_bar_size = self.cols - 20
+        progress_bar_loaded = '=' * (int(progress_bar_size * percentage / 100))
+        progress_bar_unload = '_' * (int(progress_bar_size)-int(progress_bar_size * percentage / 100))
         progress_bar = progress_bar_loaded + progress_bar_unload
         self.stdscr.addstr(8, 10, progress_bar)
 
+    def print_current_and_duration_time(self, cur_dur):
+        self.stdscr.addstr(9, 4, ' '*(self.cols-8))
+        self.stdscr.addstr(9, 9, cur_dur[0])
+        self.stdscr.addstr(9, self.cols-9-len(cur_dur[1]), cur_dur[1])
+
+    def print_process(self, info):
+        self.stdscr.addstr(6, 3, ' '*(self.cols-6))
+        self.stdscr.addstr(6, 6, info);
+        self.stdscr.refresh()
+
     def print_player_status(self, status):
+        self.stdscr.addstr(10, int(self.cols/2)-3, '        ')
         self.stdscr.addstr(10, int(self.cols/2)-3, status)
 
     def print_player_title(self, title):
+        if(len(title) > self.cols-10): title = title[:-(len(title)-(self.cols-10))]+'..'
+        self.stdscr.addstr(6, 3, ' '*(self.cols-6))
         self.stdscr.addstr(6, int((self.cols/2)-(len(title)/2)), title)
 
     def print_player_border(self):
         self.stdscr.addstr(4, 4, '-'*(self.cols-8))
-        self.stdscr.addstr(13, 4, '-'*(self.cols-8))
+        self.stdscr.addstr(12, 4, '-'*(self.cols-8))
 
     def list_up_music(self, y, x, titles, highlight_at):
         max_size = self.cols - 8
         self.stdscr.addstr(y, x+2, '* result *', curses.color_pair(2) | curses.A_BOLD)
         y = y + 2
         for i, title in enumerate(titles):
+            if(i+y > self.rows-4): break
             self.stdscr.addstr(y+i, x-1, ' '*(max_size+1))
             title_name = Parser.get_name_from_title(title)
             if(len(title_name) > max_size):
@@ -296,19 +369,28 @@ class Screen:
         self.stdscr.refresh()
 
     def console_input(self, y, x):
+        self.stdscr.timeout(-1)
         curses.echo()
         curses.curs_set(1)
-        self.stdscr.addstr(y, x, ' ' * (20))
+        self.stdscr.addstr(y, x, ' ' * (self.cols-12))
         self.stdscr.refresh()
         self.stdscr.addstr(y, x, '> ')
-        _input = self.stdscr.getstr(y, x+2, 20)
+        _input = self.stdscr.getstr(y, x+2, self.cols-12)
         curses.curs_set(0)
         curses.noecho()
         return _input.decode("utf-8")
 
 def main(stdscr):
-    parser = Parser(True)
+    try:
+        if(sys.argv[1] == '--headless'):
+            parser = Parser(True)
+    except:
+        parser = Parser()
+
+    #  try:
     screen = Screen(stdscr)
     screen.loop(parser)
+    #  except:
+    #      parser.quit()
 
 curses.wrapper(main)
