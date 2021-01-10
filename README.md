@@ -5,7 +5,7 @@ Play YouTube in background using selenium on the terminal(curses)
 # In progress
 
 # Usage
-python youplayr.py --headless
+```python youplayr.py --headless```
 
 ## Features
 * Skip youtube ads automatically when start to play video.
