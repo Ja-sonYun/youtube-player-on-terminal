@@ -30,108 +30,33 @@ class Parser:
         self.PLAY_BUTTON_PATH_TITLE = "Play (k)"
         self.PAUSE_BUTTON_PATH_TITLE = "Pause (k)"
 
-    def __del__(self):
-        self.quit()
-        print("Selenium suceessfully quitted.")
+    ########### Control Window ###########
 
-    def search_in_youtube(self, keyword):
-        self.driver.get(self.YOUTUBE_PATH+'/results?search_query={}'.format(str(keyword)))
-        self.wait.until(self.visible((By.ID, "video-title")))
+    """ use this for compare selected video title and currently playing video """
+    def find_title(self):
+        return self.driver.find_element_by_xpath("//title").get_attribute('innerHTML')[:-10] # drop - Youtube
 
-        self.titles = []
-        self.html = self.driver.page_source
-        soup = BeautifulSoup(self.html, 'html.parser')
-        title_tags = soup.find('ytd-search') \
-            .find('ytd-two-column-search-results-renderer') \
-            .find('ytd-section-list-renderer') \
-            .find(id='contents') \
-            .find('ytd-item-section-renderer') \
-            .find(id='contents') \
-            .find_all('ytd-video-renderer')
+    """ also compare with selected video title for detect ads """
+    def currently_playing_title(self):
+        return self.driver.find_element_by_xpath("//div[@class='ytp-title-text']/a").get_attribute('innerHTML')
 
-        for title_tag in title_tags:
-            self.titles.append(title_tag.find(id='meta').find('a'))
+    """ when previous video is stop playing, click next video icon """
+    def click_upnext_icon(self):
+        self.driver.find_element_by_xpath("//a[@class='ytp-upnext-autoplay-icon']").click()
 
-    def select_music_by_id(self, _id):
-        self.selected = self.titles[_id]
+    """ skip ads button """
+    def click_skip_button(self):
+        self.driver.find_element_by_xpath("//button[@class='ytp-ad-skip-button ytp-button']").click()
 
-    def is_finished(self):
-        try:
-            self.driver.find_element_by_xpath("//a[@class='ytp-upnext-autoplay-icon']").click()
-            self.prevent_stop_showing_bottom_bar()
-            return True
-        except:
-            return False
+    """ find ads area , if not exists, raise error """
+    def is_ads_exists(self):
+        self.driver.find_element_by_xpath("//div[@class='ytp-ad-player-overlay']")
 
-    def pass_ads(self, debug):
-        normal = False
-        while(True):
-            try:
-                cur_title = self.driver.find_element_by_xpath("//title").get_attribute('innerHTML')[:-10]
-                if(self.driver.find_element_by_xpath("//div[@class='ytp-title-text']/a").get_attribute('innerHTML') == cur_title):
-                    normal = True
-                    return
-            except:
-                normal = False
-            try:
-                self.driver.find_element_by_xpath("//div[@class='ytp-ad-player-overlay']")
-                is_advertising = True
-                debug('found advertisements. skipping...')
-            except:
-                is_advertising = False
-            if(normal or is_advertising): break
-            sleep(0.5)
+    def get_button_state(self):
+        return self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").get_attribute("aria-label")
 
-        while(is_advertising):
-            debug('waiting until ads end')
-            cur_title = self.driver.find_element_by_xpath("//title").get_attribute('innerHTML')[:-10] # remove - youtube
-            if(self.driver.find_element_by_xpath("//div[@class='ytp-title-text']/a").get_attribute('innerHTML') == cur_title):
-                normal = True
-                debug('advertisement not found')
-                return
-            else:
-                try:
-                    debug('trying to skip ads..')
-                    self.driver.find_element_by_xpath("//button[@class='ytp-ad-skip-button ytp-button']").click()
-                    break
-                except:
-                    sleep(0.5)
-
-    def play_music(self, debug, _id = None):
-        if(_id != None): self.select_music_by_id(_id)
-        debug('loading...')
-
-        self.driver.get(self.YOUTUBE_PATH+'{}'.format(str(self.selected['href'])))
-
-        while(True):
-            try:
-                debug('getting button state')
-                status = self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").get_attribute("aria-label")
-                status = 'playing' if self.PAUSE_BUTTON_PATH_TITLE == status else 'paused'
-                if(status == 'paused'):
-                    self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").click()
-                break
-            except:
-                sleep(0.5)
-
-        debug('checking ads exists')
-        self.pass_ads(debug)
-
-        while(True):
-            try:
-                debug('getting button state')
-                status = self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").get_attribute("aria-label")
-                status = 'playing' if self.PAUSE_BUTTON_PATH_TITLE == status else 'paused'
-                if(status == 'paused'):
-                    self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").click()
-                break
-            except:
-                sleep(0.5)
-
-        debug('almost done...')
-        self.prevent_stop_showing_bottom_bar()
-
-        self.status = status
+    def click_play_button(self):
+        self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").click()
 
     def get_video_current_and_duration(self):
         try:
@@ -140,14 +65,8 @@ class Parser:
         except:
             return ['error','error']
 
-
-    def prevent_stop_showing_bottom_bar(self):
-        while True:
-            try:
-                self.driver.find_element_by_xpath("//button[@title='Settings']").click()
-                break
-            except:
-                sleep(0.5)
+    def click_setting_button(self):
+        self.driver.find_element_by_xpath("//button[@title='Settings']").click()
 
     def music_toggle(self):
         try:
@@ -158,10 +77,6 @@ class Parser:
             self.status = 'Paused'
         sleep(0.2)
         self.prevent_stop_showing_bottom_bar()
-
-    @staticmethod
-    def get_name_from_title(title):
-        return title.find('yt-formatted-string').string
 
     def get_current_video_title(self):
         try:
@@ -197,6 +112,121 @@ class Parser:
             return True
         except:
             return False
+
+    ######################################
+
+    def __del__(self):
+        self.quit()
+        print("Selenium suceessfully quitted.")
+
+    def search_in_youtube(self, keyword):
+        self.driver.get(self.YOUTUBE_PATH+'/results?search_query={}'.format(str(keyword)))
+        self.wait.until(self.visible((By.ID, "video-title")))
+
+        self.titles = []
+        self.html = self.driver.page_source
+        soup = BeautifulSoup(self.html, 'html.parser')
+        title_tags = soup.find('ytd-search') \
+            .find('ytd-two-column-search-results-renderer') \
+            .find('ytd-section-list-renderer') \
+            .find(id='contents') \
+            .find('ytd-item-section-renderer') \
+            .find(id='contents') \
+            .find_all('ytd-video-renderer')
+
+        for title_tag in title_tags:
+            self.titles.append(title_tag.find(id='meta').find('a'))
+
+    def select_music_by_id(self, _id):
+        self.selected = self.titles[_id]
+
+    def is_finished(self):
+        try:
+            self.click_upnext_icon()
+            self.prevent_stop_showing_bottom_bar()
+            return True
+        except:
+            return False
+
+    def pass_ads(self, debug):
+        normal = False
+        while(True):
+            try:
+                if(self.currently_playing_title() == self.find_title()):
+                    normal = True
+                    return
+            except:
+                normal = False
+            try:
+                self.is_ads_exists()
+                is_advertising = True
+                debug('found advertisements. skipping...')
+            except:
+                is_advertising = False
+            if(normal or is_advertising): break
+            sleep(0.5)
+
+        while(is_advertising):
+            debug('waiting until ads end')
+            if(self.currently_playing_title() == self.find_title()):
+                normal = True
+                debug('advertisement not found')
+                return
+            else:
+                try:
+                    debug('trying to skip ads..')
+                    self.click_skip_button()
+                    break
+                except:
+                    sleep(0.5)
+
+    def play_music(self, debug, _id = None):
+        if(_id != None): self.select_music_by_id(_id)
+        debug('loading...')
+
+        self.driver.get(self.YOUTUBE_PATH+'{}'.format(str(self.selected['href'])))
+
+        while(True):
+            try:
+                debug('getting button state')
+                status = self.get_button_state()
+                status = 'playing' if self.PAUSE_BUTTON_PATH_TITLE == status else 'paused'
+                if(status == 'paused'):
+                    self.click_play_button()
+                break
+            except:
+                sleep(0.5)
+
+        debug('checking ads exist')
+        self.pass_ads(debug)
+
+        while(True):
+            try:
+                debug('getting button state')
+                status = self.get_button_state()
+                status = 'playing' if self.PAUSE_BUTTON_PATH_TITLE == status else 'paused'
+                if(status == 'paused'):
+                    self.click_play_button()
+                break
+            except:
+                sleep(0.5)
+
+        debug('almost done...')
+        self.prevent_stop_showing_bottom_bar()
+
+        self.status = status
+
+    def prevent_stop_showing_bottom_bar(self):
+        while True:
+            try:
+                self.click_setting_button()
+                break
+            except:
+                sleep(0.5)
+
+    @staticmethod
+    def get_name_from_title(title):
+        return title.find('yt-formatted-string').string
 
     def quit(self):
         self.driver.quit()
@@ -390,10 +420,7 @@ def main(stdscr):
     except:
         parser = Parser()
 
-    #  try:
     screen = Screen(stdscr)
     screen.loop(parser)
-    #  except:
-    #      parser.quit()
 
 curses.wrapper(main)
