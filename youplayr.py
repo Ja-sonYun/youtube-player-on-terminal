@@ -91,7 +91,7 @@ class Parser:
                 return
             else:
                 try:
-                    debug('finding next button')
+                    debug('trying to skip ads..')
                     self.driver.find_element_by_xpath("//button[@class='ytp-ad-skip-button ytp-button']").click()
                     break
                 except:
