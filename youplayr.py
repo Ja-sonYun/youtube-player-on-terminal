@@ -243,19 +243,19 @@ class Screen:
     def music_player_loop(self, parser):
         self.print_player_title(Parser.get_name_from_title(parser.selected))
         self.print_player_border()
-        self.stdscr.timeout(300)
-        while True:
-            self.print_player_status(parser.status)
-            self.print_player_progress_bar(parser.get_progress_as_percent())
+        #  self.stdscr.timeout(300)
+        #  while True:
+        self.print_player_status(parser.status)
+        self.print_player_progress_bar(parser.get_progress_as_percent())
 
-            self.stdscr.refresh()
+        self.stdscr.refresh()
 
-            c = self.stdscr.getch()
-            if c == 'k':
-                parser.music_toggle()
-            elif c == 'q':
-                self.clear_box()
-                break
+            #  c = self.stdscr.getch()
+            #  if c == 'k':
+            #      parser.music_toggle()
+            #  elif c == 'q':
+            #      self.clear_box()
+            #      break
 
 
     def print_player_progress_bar(self, percent):
