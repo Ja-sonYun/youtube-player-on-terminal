@@ -52,6 +52,9 @@ class Parser:
     def is_ads_exists(self):
         self.driver.find_element_by_xpath("//div[@class='ytp-ad-player-overlay']")
 
+    def toggle_volumn(self):
+        self.driver.find_element_by_xpath("//button[@class='ytp-mute-button ytp-button']").click()
+
     def get_button_state(self):
         return self.driver.find_element_by_xpath("//button[@class='ytp-play-button ytp-button']").get_attribute("aria-label")
 
@@ -108,6 +111,7 @@ class Parser:
     def next_music(self):
         try:
             self.driver.find_element_by_xpath("//a[@class='ytp-next-button ytp-button']").click()
+            sleep(0.5)
             self.prevent_stop_showing_bottom_bar()
             return True
         except:
@@ -160,6 +164,7 @@ class Parser:
             try:
                 self.is_ads_exists()
                 is_advertising = True
+                self.toggle_volumn()
                 debug('found advertisements. skipping...')
             except:
                 is_advertising = False
@@ -171,7 +176,7 @@ class Parser:
             if(self.currently_playing_title() == self.find_title()):
                 normal = True
                 debug('advertisement not found')
-                return
+                break
             else:
                 try:
                     debug('trying to skip ads..')
@@ -179,6 +184,14 @@ class Parser:
                     break
                 except:
                     sleep(0.5)
+
+        if(is_advertising):
+            while True:
+                try:
+                    self.toggle_volumn()
+                    break
+                except:
+                    sleep(0.2)
 
     def play_music(self, debug, _id = None):
         if(_id != None): self.select_music_by_id(_id)
