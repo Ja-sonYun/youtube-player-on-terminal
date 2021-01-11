@@ -14,10 +14,13 @@ class Parser:
     def __init__(self, is_headless=False):
         options = webdriver.ChromeOptions()
         CHROMEDRIVER_PATH = '/Users/jasonyun/.chromedriver'
+        SAFARIDRIVER_PATH = '/usr/bin/safaridriver'
         self.YOUTUBE_PATH = 'https://www.youtube.com'
         if(is_headless):
             options.add_argument("--headless")
         self.driver = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, options=options)
+        #  self.driver = webdriver.Safari(executable_path=SAFARIDRIVER_PATH)
+        self.driver.set_window_size(1900, 1900)
         self.wait = WebDriverWait(self.driver, 3)
         self.presence = EC.presence_of_element_located
         self.visible = EC.visibility_of_element_located
@@ -73,12 +76,12 @@ class Parser:
 
     def music_toggle(self):
         try:
-            self.driver.find_element_by_xpath("//button[@aria-label='Play (k)']").click()
+            self.driver.find_element_by_xpath("//button[@title='Play (k)']").click()
             self.status = 'playing'
         except:
-            self.driver.find_element_by_xpath("//button[@aria-label='Pause (k)']").click()
+            self.driver.find_element_by_xpath("//button[@title='Pause (k)']").click()
             self.status = 'Paused'
-        sleep(0.2)
+        sleep(0.5)
         self.prevent_stop_showing_bottom_bar()
 
     def is_setting_opened(self):
@@ -87,7 +90,6 @@ class Parser:
             return True
         except:
             return False
-
 
     def get_current_video_title(self):
         try:
@@ -124,6 +126,13 @@ class Parser:
             return True
         except:
             return False
+
+    def close_unnecessary_elements(self):
+        try:
+            self.driver.find_element_by_xpath("//*[contains(text(), 'SKIP TRIAL')]").click()
+            self.driver.find_element_by_xpath("//*[contains(text(), 'SKIP TRIAL')]").click()
+        except:
+            pass
 
     ######################################
 
@@ -162,7 +171,8 @@ class Parser:
 
     def pass_ads(self, debug):
         normal = False
-        while(True):
+        while True:
+            debug('getting ad info', True)
             try:
                 if(self.currently_playing_title() == self.find_title()):
                     normal = True
@@ -172,37 +182,47 @@ class Parser:
             try:
                 self.is_ads_exists()
                 is_advertising = True
-                self.toggle_volumn()
+                #  self.toggle_volumn()
                 debug('found advertisements. skipping...')
             except:
                 is_advertising = False
             if(normal or is_advertising): break
             sleep(0.5)
 
+        count = 0
         while(is_advertising):
-            debug('waiting until ads end')
+            if(count > 8):
+                debug('fail.reloading..', True)
+                self.driver.navigate().refresh()
+            debug(str(count), True)
             if(self.currently_playing_title() == self.find_title()):
                 normal = True
                 debug('advertisement not found')
                 break
             else:
                 try:
-                    debug('trying to skip ads..')
+                    debug('trying to skip ads')
                     self.click_skip_button()
                     break
                 except:
-                    sleep(0.5)
+                    try:
+                        self.click_setting_button()
+                    except:
+                        pass
+                    count = count + 1
+                    sleep(1.0)
 
-        if(is_advertising):
-            while True:
-                try:
-                    self.toggle_volumn()
-                    break
-                except:
-                    sleep(0.2)
+        #  if(is_advertising):
+        #      while True:
+        #          debug('trying to unmute', True)
+        #          try:
+        #              self.toggle_volumn()
+        #              break
+        #          except:
+        #              sleep(0.2)
 
-        if(not self.is_setting_opened()):
-            self.click_setting_button()
+        #  if(self.is_setting_opened() is not True):
+        #      self.click_setting_button()
 
     def play_music(self, debug, _id = None):
         if(_id != None): self.select_music_by_id(_id)
@@ -210,7 +230,7 @@ class Parser:
 
         self.driver.get(self.YOUTUBE_PATH+'{}'.format(str(self.selected['href'])))
 
-        while(True):
+        while True:
             try:
                 debug('getting button state')
                 status = self.get_button_state()
@@ -224,7 +244,7 @@ class Parser:
         debug('checking ads exist')
         self.pass_ads(debug)
 
-        while(True):
+        while True:
             try:
                 debug('getting button state')
                 status = self.get_button_state()
@@ -352,6 +372,7 @@ class Screen:
     def music_player_loop(self, parser):
         self.print_player_border()
         while True:
+            parser.close_unnecessary_elements()
             parser.is_finished() #  move to next vidoe
             self.print_player_status(parser.status)
             self.print_player_progress_bar(parser.get_progress_as_percent())
@@ -364,7 +385,7 @@ class Screen:
             c = self.stdscr.getch()
             try:
                 c = chr(c)
-                if c == 'k':
+                if c == 'm':
                     parser.music_toggle()
                 if c == 'n':
                     parser.next_music()
@@ -387,10 +408,13 @@ class Screen:
         self.stdscr.addstr(9, 9, cur_dur[0])
         self.stdscr.addstr(9, self.cols-9-len(cur_dur[1]), cur_dur[1])
 
-    def print_process(self, info):
-        self.stdscr.addstr(6, 3, ' '*(self.cols-6))
-        self.stdscr.addstr(6, 6, info);
-        self.stdscr.refresh()
+    def print_process(self, info, is_log=False):
+        if(is_log):
+            self.console_log(info)
+        else:
+            self.stdscr.addstr(6, 3, ' '*(self.cols-6))
+            self.stdscr.addstr(6, 6, info);
+            self.stdscr.refresh()
 
     def print_player_status(self, status):
         self.stdscr.addstr(10, int(self.cols/2)-3, '        ')
@@ -422,6 +446,7 @@ class Screen:
                 self.stdscr.addstr(y+i, x, title_name + ' ')
 
     def console_log(self, log):
+        self.stdscr.addstr(0, 0, '          ')
         self.stdscr.addstr(0, 0, log)
         self.stdscr.refresh()
 
