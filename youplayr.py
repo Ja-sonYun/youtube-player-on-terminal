@@ -81,6 +81,14 @@ class Parser:
         sleep(0.2)
         self.prevent_stop_showing_bottom_bar()
 
+    def is_setting_opened(self):
+        try:
+            self.driver.find_element_by_xpath("//button[@class='ytp-button ytp-settings-button']").get_attribute('aria-expanded')
+            return True
+        except:
+            return False
+
+
     def get_current_video_title(self):
         try:
             return self.driver.find_element_by_xpath("//*[@id='container']/h1/yt-formatted-string").get_attribute('innerHTML')
@@ -192,6 +200,9 @@ class Parser:
                     break
                 except:
                     sleep(0.2)
+
+        if(not self.is_setting_opened()):
+            self.click_setting_button()
 
     def play_music(self, debug, _id = None):
         if(_id != None): self.select_music_by_id(_id)
