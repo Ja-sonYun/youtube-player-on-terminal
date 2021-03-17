@@ -3,6 +3,7 @@
 ![demo](https://github.com/Ja-sonYun/youtube-player-on-terminal/blob/main/sam.gif?raw=true)
 Play YouTube in background using selenium on the terminal(curses)
 # In progress
+# to control browser that displaying youtube from terminal
 
 # Usage
 ```python youplayr.py --headless```   
